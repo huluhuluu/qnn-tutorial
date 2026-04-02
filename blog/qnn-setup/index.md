@@ -5,8 +5,9 @@ lastmod: 2026-04-01T15:30:00+08:00
 draft: false
 description: "QNN SDK 安装与配置指南"
 slug: "qnn-setup"
-tags: ["QNN", "Qualcomm", "环境配置"]
-categories: ["QNN教程"]
+tags: ["qnn"]
+categories: ["qnn"]
+
 comments: true
 math: true
 ---
@@ -70,7 +71,7 @@ $env:QNN_SDK_ROOT = "C:\qnn\QNN"
 $env:Path += ";C:\qnn\QNN\bin"
 
 # 永久设置
-[Environment]::SetEnvironmentVariable("QNN_SDK_ROOT", "C:\qnn\QNN", "User")
+[Environment]::SetEnvironmentVariable("QNN_SDK_ROOT",  "C:\qnn\QNN",  "User")
 ```
 
 ## 4. 验证安装
@@ -134,3 +135,4 @@ make -j4
 
 - [QNN SDK 下载](https://developer.qualcomm.com/software/qualcomm-ai-engine-direct-sdk)
 - [QNN 示例代码](https://github.com/quic/aimet-model-zoo)
+

@@ -5,8 +5,9 @@ lastmod: 2026-04-01T15:00:00+08:00
 draft: false
 description: "Qualcomm QNN 量化推理框架介绍"
 slug: "qnn-intro"
-tags: ["QNN", "Qualcomm", "量化", "移动端推理"]
-categories: ["QNN教程"]
+tags: ["qnn"]
+categories: ["qnn"]
+
 comments: true
 math: true
 ---
@@ -50,10 +51,10 @@ QNN 提供：
 
 | 模型类型 | 示例 |
 |---------|------|
-| 图像分类 | ResNet, MobileNet, EfficientNet |
-| 目标检测 | YOLO, SSD, MobileDet |
-| 语义分割 | DeepLab, U-Net |
-| NLP | BERT, GPT (部分支持) |
+| 图像分类 | ResNet,  MobileNet,  EfficientNet |
+| 目标检测 | YOLO,  SSD,  MobileDet |
+| 语义分割 | DeepLab,  U-Net |
+| NLP | BERT,  GPT (部分支持) |
 
 ### 2.2 量化支持
 
@@ -96,3 +97,4 @@ QNN 提供：
 - [Qualcomm AI Engine Direct SDK](https://developer.qualcomm.com/software/qualcomm-ai-engine-direct-sdk)
 - [QNN GitHub](https://github.com/quic/aimet-model-zoo)
 - [Hexagon SDK](https://developer.qualcomm.com/software/hexagon-dsp-sdk)
+

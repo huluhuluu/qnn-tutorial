@@ -1,17 +1,18 @@
 ---
-title: "QNN 量化教程"
+title: "QNN 量化tutorial"
 date: 2026-04-01T15:00:00+08:00
 lastmod: 2026-04-01T15:00:00+08:00
 draft: false
-description: "Qualcomm AI Engine Direct SDK 量化部署教程"
+description: "Qualcomm AI Engine Direct SDK 量化部署tutorial"
 slug: "qnn-tutorial"
-tags: ["QNN", "量化", "Qualcomm", "端侧AI"]
-categories: ["教程"]
+tags: ["qnn"]
+categories: ["qnn"]
+
 comments: true
 math: true
 ---
 
-# QNN 量化教程
+# QNN 量化tutorial
 
 QNN (Qualcomm AI Engine Direct) 是高通提供的 AI 推理框架，支持在 Snapdragon 平台上高效部署深度学习模型。
 
@@ -27,3 +28,4 @@ QNN (Qualcomm AI Engine Direct) 是高通提供的 AI 推理框架，支持在 S
 
 - [QNN 官方文档](https://docs.qualcomm.com/bundle/qualcomm-ai-engine-direct-sdk/index.html)
 - [Qualcomm AI Hub](https://aihub.qualcomm.com/)
+

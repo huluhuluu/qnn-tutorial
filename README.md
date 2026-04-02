@@ -1,6 +1,6 @@
 # QNN_TUTORIAL
 
-Qualcomm QNN (Quantization Neural Network) 量化推理教程。
+Qualcomm QNN (Quantization Neural Network) 量化推理tutorial。
 
 ## 目录
 
@@ -25,3 +25,4 @@ code/
 
 - [QNN 官方文档](https://developer.qualcomm.com/software/qualcomm-ai-engine-direct-sdk)
 - [Hexagon DSP 文档](https://developer.qualcomm.com/software/hexagon-dsp-sdk)
+

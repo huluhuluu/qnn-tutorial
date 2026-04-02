@@ -5,8 +5,9 @@ lastmod: 2026-04-01T16:00:00+08:00
 draft: false
 description: "QNN 模型量化流程详解"
 slug: "qnn-quantization"
-tags: ["QNN", "量化", "模型优化"]
-categories: ["QNN教程"]
+tags: ["qnn"]
+categories: ["qnn"]
+
 comments: true
 math: true
 ---
@@ -46,14 +47,14 @@ model.load_state_dict(torch.load('model.pth'))
 model.eval()
 
 # 导出 ONNX
-dummy_input = torch.randn(1, 3, 224, 224)
+dummy_input = torch.randn(1,  3,  224,  224)
 torch.onnx.export(
-    model,
-    dummy_input,
-    'model.onnx',
-    input_names=['input'],
-    output_names=['output'],
-    dynamic_axes={'input': {0: 'batch'}, 'output': {0: 'batch'}}
+    model, 
+    dummy_input, 
+    'model.onnx', 
+    input_names=['input'], 
+    output_names=['output'], 
+    dynamic_axes={'input': {0: 'batch'},  'output': {0: 'batch'}}
 )
 ```
 
@@ -86,8 +87,8 @@ calib_data = load_calibration_data()  # 100-500 张图片
 
 # 创建量化器
 quantizer = PostTrainingQuantizer(
-    model=model,
-    calibration_data=calib_data,
+    model=model, 
+    calibration_data=calib_data, 
     quant_scheme='int8'
 )
 
@@ -107,15 +108,15 @@ import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
 transform = transforms.Compose([
-    transforms.Resize(224),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                        std=[0.229, 0.224, 0.225])
+    transforms.Resize(224), 
+    transforms.CenterCrop(224), 
+    transforms.ToTensor(), 
+    transforms.Normalize(mean=[0.485,  0.456,  0.406], 
+                        std=[0.229,  0.224,  0.225])
 ])
 
-calib_dataset = datasets.ImageFolder('calibration_images', transform=transform)
-calib_loader = torch.utils.data.DataLoader(calib_dataset, batch_size=1)
+calib_dataset = datasets.ImageFolder('calibration_images',  transform=transform)
+calib_loader = torch.utils.data.DataLoader(calib_dataset,  batch_size=1)
 
 # 校准数据要求
 # - 数量：100-500 张
@@ -128,23 +129,23 @@ calib_loader = torch.utils.data.DataLoader(calib_dataset, batch_size=1)
 ```python
 # Min-Max 校准
 quantizer = PostTrainingQuantizer(
-    model=model,
-    calibration_data=calib_data,
+    model=model, 
+    calibration_data=calib_data, 
     quant_scheme='min_max'
 )
 
 # 熵校准（推荐）
 quantizer = PostTrainingQuantizer(
-    model=model,
-    calibration_data=calib_data,
+    model=model, 
+    calibration_data=calib_data, 
     quant_scheme='entropy'
 )
 
 # 百分位校准
 quantizer = PostTrainingQuantizer(
-    model=model,
-    calibration_data=calib_data,
-    quant_scheme='percentile',
+    model=model, 
+    calibration_data=calib_data, 
+    quant_scheme='percentile', 
     percentile=99.9
 )
 ```
@@ -154,14 +155,14 @@ quantizer = PostTrainingQuantizer(
 ```python
 import numpy as np
 
-def evaluate_quantization(model_fp32, model_int8, test_loader):
+def evaluate_quantization(model_fp32,  model_int8,  test_loader):
     """比较量化前后精度"""
     
     correct_fp32 = 0
     correct_int8 = 0
     total = 0
     
-    for images, labels in test_loader:
+    for images,  labels in test_loader:
         # FP32 推理
         output_fp32 = model_fp32(images)
         pred_fp32 = output_fp32.argmax(dim=1)
@@ -203,3 +204,4 @@ def evaluate_quantization(model_fp32, model_int8, test_loader):
 
 - [QNN 量化文档](https://developer.qualcomm.com/software/qualcomm-ai-engine-direct-sdk/getting-started/quantization)
 - [AIMET 量化工具](https://quic.github.io/aimet-pages/)
+
