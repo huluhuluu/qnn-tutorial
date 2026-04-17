@@ -1,9 +1,9 @@
 ---
-title: "QNN 核心概念与调用流程"
+title: "QNN 介绍"
 date: 2026-04-01T15:00:00+08:00
-lastmod: 2026-04-15T21:20:00+08:00
+lastmod: 2026-04-17T14:10:00+08:00
 draft: false
-description: "QNN SDK 架构、Backend 体系、Graph API 与 Android 端完整调用流程"
+description: "基于 QNN API overview 的介绍，包含 QNN 组件和执行流程等内容。"
 slug: "qnn-intro"
 tags: ["qnn"]
 categories: ["qnn"]
@@ -11,189 +11,174 @@ comments: true
 math: true
 ---
 
-# QNN 核心概念与调用流程
+# QNN 介绍与 API 执行流程
 
-如果你以前主要接触 `ONNX Runtime / TFLite / MNN`，第一次看 `QNN` 往往会觉得对象很多、名字很散。其实可以先把它理解成两层：
+## 1. QNN 是什么
 
-- 上层是统一的 C API。
-- 下层是不同硬件后端的实现，最常见的是 `CPU / GPU / HTP`。
+[`QNN SDK`](https://docs.qualcomm.com/nav/home/general_introduction.html?product=1601111740010412) 是 Qualcomm 官方提供的多设备推理开发套件，支持 Android 和 Linux 端的 `CPU`、`GPU`、`HTP` 等后端。如图 1 所示，它在应用和具体硬件之间提供了一层统一抽象，让上层尽量使用同一套接口。
 
-## 1. QNN 到底在抽象什么
+![图 1. QNN 软件架构示意](./png/qnn-software-architecture.png)
+*图 1. QNN 软件架构示意。*
 
-QNN 想做的是把“模型描述”和“硬件执行”拆开。
+可以把 QNN 理解成两层：
 
-```text
-Application
-    |
-QNN Interface
-    |
-+----------------+----------------+----------------+
-| CPU Backend    | GPU Backend    | HTP Backend    |
-+----------------+----------------+----------------+
-| Kryo CPU       | Adreno GPU     | Hexagon / HTP  |
-+----------------+----------------+----------------+
-```
+- 上层是一套统一的 `C API`。
+- 下层是不同硬件后端的实现，最常见的是 `CPU`、`GPU` 和 `HTP`。
 
-这意味着上层逻辑可以尽量保持一致，而底层换到不同后端时，主要变化落在：
+QNN 想做的是把“计算描述”和“硬件执行”拆开。应用层尽量复用同一套接口，而底层切换后端时，主要差异体现在：
 
-- 加载哪个 backend 动态库。
-- 图能否被编译到目标硬件。
-- Tensor 类型和量化参数是否符合该后端要求。
+- 加载的后端动态库不同。
+- 计算图是否能被编译到目标硬件不同。
+- 张量的数据类型、量化参数和内存描述要求不同。
 
-## 2. 五个最重要的对象
+下面列出部分支持的高通平台，详细列表可以参考[官方文档](https://docs.qualcomm.com/nav/home/QNN_general_overview.html?product=1601111740010412#software-architecture)。
 
-### 2.1 Backend
+**表 1. 部分支持的 Snapdragon 平台**
 
-Backend 表示目标执行后端。
+| Snapdragon Device/Chip | Supported Toolchains | SOC Model | Hexagon Arch | LPAI Arch |
+| :--- | :--- | :---: | :---: | :---: |
+| SD 8 Elite Gen 5 (SM8850) | `aarch64-android` | 87 | V81 | v6 |
+| SD 8 Elite (SM8750) | `aarch64-android` | 69 | V79 | v5 |
+| SD 8 Gen 3 (SM8650) | `aarch64-android` | 57 | V75 | – |
 
-- `CPU` 适合调试和对齐结果。
-- `GPU` 适合浮点路径。
-- `HTP` 适合量化推理，也是手机端真正值得投入的方向。
+## 2. 关键组件
 
-### 2.2 Device
+QNN 文档把 API 组件分成了 `Core`、`Utility`、`System` 三类。  
+如图 2 所示，`Core` 负责执行主链，`Utility` 负责性能分析和日志，`System` 负责运行时配套能力。
 
-Device 表示具体的硬件设备和设备配置。很多时候你会把它看成“和后端配套的执行环境”。
+![图 2. QNN API 组件分类](./png/qnn-api-components.png)
+*图 2. QNN API 组件分类。*
 
-### 2.3 Context
+### 2.1 Core 组件
 
-Context 可以理解成一次模型部署会话对应的资源容器。
+- `QnnBackend`
+  顶层 QNN API 组件之一。大多数 QNN API 都要求先初始化后端；同时也提供 `OpPackage` 注册相关能力。
+- `QnnDevice`
+  顶层 QNN API 组件之一，用来描述设备和多核资源。一个平台可能包含多个设备，每个设备又可能包含多个核心；同时还提供性能控制能力。
+- `QnnContext`
+  为计算图和执行操作提供执行环境。计算图以及跨图共享的张量都创建在同一个上下文中；上下文还可以被缓存成二进制形式，供后续更快加载。
+- `QnnGraph`
+  提供可组合的计算图 API。计算图创建在上下文内部，由节点和张量组成；调用 `finalize` 之后才进入可执行状态。
+- `QnnGlobalConfig`
+  用于设置全局配置参数。
+- `QnnTensor`
+  用来表示静态常量数据，或者输入输出激活数据。张量可以具有 `Context` 作用域，也可以具有 `Graph` 作用域；同一个上下文下的多个计算图可以共享 `Context` 作用域张量。
+- `QnnOpPackage`
+  提供后端使用已注册算子包库的接口，这部分也对应自定义算子的扩展能力。
 
-- 它负责持有编译后的图和运行期资源。
-- 你也可以把它理解成“模型实例”。
+### 2.2 Utility 组件
 
-### 2.4 Graph
+- `QnnProfile`
+  提供性能分析能力，用来评估计算图和操作的性能，包括时间和内存。
+- `QnnLog`
+  提供日志输出能力，`QnnBackend` 和 `QnnOpPackage` 都可以使用，并且它可以早于 `QnnBackend` 初始化。
 
-Graph 是实际执行的计算图。
+### 2.3 System 组件
 
-- 可以通过 API 在线构图。
-- 也可以提前离线生成，再运行时直接加载。
+- `QnnProperty`
+  提供能力查询接口，客户端可以在不初始化 `QnnBackend` 的情况下直接查询后端能力。
+- `QnnMem`
+  用来把外部分配的内存注册到后端。
+- `QnnSignal`
+  提供信号对象管理能力，用来控制其他组件的执行。
 
-### 2.5 Tensor
+如果只记主线，可以先抓住下面几个对象：
 
-Tensor 不只是数据地址，还包含：
+- `QnnBackend`：决定你使用哪个后端。
+- `QnnDevice`：决定后端最终落到哪个设备、哪个核心。
+- `QnnContext`：决定计算图的执行环境，以及图之间是否共享资源。
+- `QnnGraph`：决定真正要执行的计算图。
+- `QnnTensor`：决定图里每条边到底是什么数据。
 
-- 数据类型。
-- 维度信息。
-- 量化参数。
-- 内存类型和缓冲区描述。
+后面在讲缓存加载执行时，还会遇到 `QnnSystemContext`。  
+它不属于这里的执行主链对象，但在读取上下文二进制元信息时非常关键。
 
-真正容易出错的地方往往不是“图没建起来”，而是输入输出 Tensor 的数据类型和量化参数不匹配。
+## 3. 执行路径
 
-## 3. 推荐的心智模型
+QNN 常见执行路径可以分成两类：
 
-我建议把 QNN 的工作流记成下面这条链：
+- 在线构图执行
+- 离线缓存执行
 
-```text
-加载 Backend
--> 创建设备 Device
--> 创建/加载 Context
--> 拿到 Graph
--> 准备输入输出 Tensor
--> 执行 Graph
--> 回收资源
-```
+### 3.1 在线构图执行
 
-如果是在线构图，会多出：
+在线构图执行流程如图 3 所示。
 
-```text
-Graph create -> add node -> finalize
-```
+![图 3. QNN 在线构图执行流程](./png/qnn-basic-call-flow.png)
+*图 3. QNN 在线构图执行流程。*
 
-如果是离线准备，则运行时会变成：
+#### 3.1.1 初始化与算子包注册
 
-```text
-contextCreateFromBinary -> graph execute
-```
+运行 QNN 时，一般先创建 `QnnBackend`。  
+如果需要日志能力，可以更早初始化 `QnnLog`；如果需要自定义算子，则在后端创建之后注册 `QnnOpPackage`；随后创建 `QnnContext`。
 
-## 4. 在线构图和离线准备怎么选
+#### 3.1.2 构图与定型
 
-### 4.1 在线构图
+在 `QnnContext` 中，通过 `QnnGraph_create()` 创建一张空计算图，随后逐步往图中添加张量和节点，最终形成完整计算图。  
+图构建完成之后，再调用 `QnnGraph_finalize()` 完成图定型，并触发后续的图优化和编译工作。
 
-优点：
+QNN 对张量类型做了明确区分：
 
-- 灵活，适合验证小图或自定义流程。
-- 方便理解 Tensor 和 Node 的组织方式。
+- 图输入张量：`QNN_TENSOR_TYPE_APP_WRITE`
+- 图输出张量：`QNN_TENSOR_TYPE_APP_READ`
+- 图内部中间张量：`QNN_TENSOR_TYPE_NATIVE`
+- 静态常量张量：`QNN_TENSOR_TYPE_STATIC`
+- 用来连接多个计算图的上下文张量：`QNN_TENSOR_TYPE_APP_READWRITE`
 
-缺点：
+这里有几个特别重要的约束：
 
-- 启动慢。
-- 图编译开销重。
-- 更像开发态工作流，不像生产态工作流。
+- 张量名字在同一个上下文内必须唯一，重名属于未定义行为。
+- QNN 没有提供删除已注册节点或张量的 API。
+- 往图里添加节点时，顺序应该遵守依赖顺序。
 
-### 4.2 离线准备
+#### 3.1.3 图执行
 
-优点：
+计算图构建完成之后，应用就可以开始执行。QNN 提供两类执行接口：
 
-- 冷启动更快。
-- 部署流程更稳定。
-- 更接近真实 Android 应用落地方式。
+- 同步执行：`QnnGraph_execute()`
+- 异步执行：`QnnGraph_executeAsync()`
 
-缺点：
+异步接口会额外带上一组通知参数，用来在执行结束时通知应用。
 
-- 调试不如在线构图直观。
-- 需要先把转换工具链走通。
+#### 3.1.4 资源释放
 
-我的建议是：
+执行完成之后，应用可以通过 `QnnContext_free()` 销毁自己创建的上下文。  
+上下文被释放时，它持有的计算图也会一起销毁。
 
-- 学习阶段用在线构图理解对象关系。
-- 真正部署阶段优先走离线准备。
+之后，再通过 `QnnBackend_free()` 释放后端句柄。  
+这一步会让整个后端相关的资源和句柄失效。
 
-## 5. 你真正会经历的完整链路
+### 3.2 离线缓存执行
 
-从模型到手机端执行，通常是下面这条链：
+#### 3.2.1 上下文缓存
 
-```text
-PyTorch / ONNX
--> QNN converter
--> model library
--> context binary
--> Android app / native demo
-```
+QNN 允许应用把已经构好的计算图和上下文缓存成二进制形式，供后续复用。
 
-每一步分别负责：
+![图 4. QNN 上下文缓存流程](./png/qnn-context-caching.png)
+*图 4. QNN 上下文缓存流程。*
 
-- `converter`：把模型描述转成 QNN 能理解的形式。
-- `model library`：生成目标平台可加载的模型库。
-- `context binary`：把图进一步编译成更接近目标硬件的运行时产物。
+在建图完成之后，可以通过 `QnnContext_getBinary()` 获取上下文的二进制形式；如果需要预估缓存大小，则可以先调用 `QnnContext_getBinarySize()`。  
+把这份二进制数据保存下来，就完成了上下文缓存。
 
-## 6. Android 端实际调用顺序
+#### 3.2.2 缓存加载与执行
 
-下面这条顺序比记单个 API 名字更重要：
+QNN 也可以直接跳过建图部分，加载前面生成好的上下文二进制数据，然后直接进入执行阶段，如图 5 所示。
 
-```text
-dlopen backend
--> 获取 QNN 接口
--> backendCreate
--> deviceCreate
--> contextCreate / contextCreateFromBinary
--> graphExecute
--> 读取输出
--> release
-```
+![图 5. QNN 缓存加载执行流程](./png/qnn-cache-based-execution.png)
+*图 5. QNN 缓存加载执行流程。*
 
-如果是 `HTP` 路线，还要把设备端动态库、stub/skel 和模型产物一起考虑，不然程序可能根本起不来。
+这条路径里最关键的几个接口是：
 
-## 7. 初学者最容易混淆的三件事
+- `QnnContext_createFromBinary()`：从缓存二进制恢复上下文。
+- `QnnGraph_retrieve()`：从上下文中取回已经完成定型的计算图。
+- `QnnSystemContext_getBinaryInfo()`：读取上下文二进制中的图和张量元信息。
 
-### 7.1 QNN 不是只做量化
+这里还有一个容易漏掉的点：
 
-QNN 不是“量化工具”，而是一整套推理执行框架。量化只是其中最常见、最有价值的一条路径。
+- 自定义 `OpPackage` 不会随着上下文一起缓存。
+- 加载缓存执行时，仍然需要手动调用 `QnnBackend_registerOpPackage()` 重新注册。
 
-### 7.2 Context Binary 不是普通模型文件
+## 4. 参考资料
 
-它更接近“已经为目标后端准备好的执行产物”，和单纯的 `onnx`、`tflite` 不是一个层次。
-
-### 7.3 HTP 不是自动就会快
-
-只有图能被正确量化、算子支持良好、内存和部署方式配套时，HTP 才真的有明显优势。
-
-## 8. 一句话总结
-
-看懂 QNN 的关键不是背 API，而是先把对象关系理顺：
-
-- `Backend` 决定你跑在哪。
-- `Context` 决定你加载了什么。
-- `Graph` 决定你执行什么。
-- `Tensor` 决定你喂进去和拿出来的到底是什么。
-
-后面再去看环境配置、量化和 Graph API，思路会顺很多。
+- [QNN API Overview](https://docs.qualcomm.com/nav/home/api_overview.html?product=1601111740010412)
+- [QNN API Usage Guidelines](https://docs.qualcomm.com/nav/home/api_usage_guidelines.html?product=1601111740010412)
