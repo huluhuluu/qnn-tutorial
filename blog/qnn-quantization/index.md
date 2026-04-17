@@ -1,207 +1,148 @@
 ---
-title: "QNN 模型量化"
+title: "QNN 模型量化与离线准备"
 date: 2026-04-01T16:00:00+08:00
-lastmod: 2026-04-01T16:00:00+08:00
+lastmod: 2026-04-15T21:20:00+08:00
 draft: false
-description: "QNN 模型量化流程详解"
+description: "从 ONNX 到 QNN model library 与 context binary 的初版流程说明"
 slug: "qnn-quantization"
 tags: ["qnn"]
 categories: ["qnn"]
-
 comments: true
 math: true
 ---
 
-# QNN 模型量化
+# QNN 模型量化与离线准备
 
-本文介绍如何使用 QNN 工具将 PyTorch/ONNX 模型量化为 INT8 格式。
+这篇不想把重点放在“量化公式”本身，而是放在 QNN 部署时真正会走的那条工程链：
 
-## 1. 量化概述
-
-### 1.1 什么是量化
-
-量化是将浮点模型转换为低精度整数模型：
-
-$$
-x_{int} = \text{round}\left(\frac{x_{float}}{scale}\right) + \text{offset}
-$$
-
-### 1.2 量化类型
-
-| 类型 | 说明 |
-|------|------|
-| 训练后量化 (PTQ) | 训练后直接量化，无需重训练 |
-| 量化感知训练 (QAT) | 训练时考虑量化误差，精度更高 |
-
-## 2. 准备模型
-
-### 2.1 导出 ONNX
-
-```python
-import torch
-import torch.onnx
-
-# 加载模型
-model = MyModel()
-model.load_state_dict(torch.load('model.pth'))
-model.eval()
-
-# 导出 ONNX
-dummy_input = torch.randn(1,  3,  224,  224)
-torch.onnx.export(
-    model, 
-    dummy_input, 
-    'model.onnx', 
-    input_names=['input'], 
-    output_names=['output'], 
-    dynamic_axes={'input': {0: 'batch'},  'output': {0: 'batch'}}
-)
+```text
+ONNX
+-> 校准数据
+-> QNN converter
+-> model library
+-> context binary
+-> 设备侧执行
 ```
 
-## 3. 使用 QNN 量化
+## 1. 为什么在 QNN 里量化特别重要
 
-### 3.1 命令行工具
+在高通平台上，真正值得投入的通常是 `HTP` 路线，而 `HTP` 最常见、最有价值的部署方式就是量化推理。
+
+所以你可以把 QNN 的量化理解成两件事同时发生：
+
+- 一件是模型数值格式变了。
+- 另一件是它终于更适合被目标硬件吃下去了。
+
+## 2. 我建议的输入模型要求
+
+准备 ONNX 时，优先保证三件事：
+
+- 输入输出名字稳定。
+- shape 尽量固定。
+- 图里不要留太多边缘算子或自定义算子。
+
+原因很简单：你越早把图裁干净，后面转换和量化越稳定。
+
+## 3. 推荐的初版量化流程
+
+### 3.1 准备校准数据
+
+校准数据不一定要很多，但一定要“像真的输入”。
+
+核心原则：
+
+- 预处理和真实推理一致。
+- 覆盖主要输入分布。
+- 先追求稳定，再追求极限压缩。
+
+### 3.2 先做模型转换
+
+思路上可以写成：
 
 ```bash
-# 模型转换
-qnn-onnx-converter --input_model model.onnx --output_path model.cpp
+qnn-onnx-converter \
+  --input_model model.onnx \
+  --output_path model.cpp
+```
 
-# 模型量化
+这一步的目标不是直接部署，而是把模型先变成 QNN 认识的描述形式。
+
+### 3.3 生成模型库
+
+接着把模型描述编译成目标平台可加载的模型库：
+
+```bash
 qnn-model-lib-generator \
-    --model model.cpp \
-    --backend libQnnHtp.so \
-    --output_dir output
+  -c model.cpp \
+  -b model.bin \
+  -t aarch64-android
 ```
 
-### 3.2 Python API
+你可以把这里产出的东西理解成“还没完全落到设备后端，但已经比原始 ONNX 更接近运行态”。
 
-```python
-import qnn
-from qnn.quantization import PostTrainingQuantizer
+### 3.4 生成 Context Binary
 
-# 加载模型
-model = qnn.load_model('model.onnx')
+最后再把图准备成更接近目标硬件的 context binary：
 
-# 准备校准数据
-calib_data = load_calibration_data()  # 100-500 张图片
-
-# 创建量化器
-quantizer = PostTrainingQuantizer(
-    model=model, 
-    calibration_data=calib_data, 
-    quant_scheme='int8'
-)
-
-# 执行量化
-quantized_model = quantizer.quantize()
-
-# 保存模型
-quantized_model.save('model_quantized.bin')
+```bash
+qnn-context-binary-generator \
+  --model libmodel.so \
+  --backend libQnnHtp.so \
+  --output_dir output
 ```
 
-## 4. 校准数据
+这一步之后，运行时就不再是“临时编译图”，而是“直接加载准备好的执行产物”。
 
-### 4.1 准备校准集
+## 4. 真正容易出问题的地方
 
-```python
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
+### 4.1 输入预处理和校准不一致
 
-transform = transforms.Compose([
-    transforms.Resize(224), 
-    transforms.CenterCrop(224), 
-    transforms.ToTensor(), 
-    transforms.Normalize(mean=[0.485,  0.456,  0.406], 
-                        std=[0.229,  0.224,  0.225])
-])
+这是量化精度掉得最常见的原因之一。
 
-calib_dataset = datasets.ImageFolder('calibration_images',  transform=transform)
-calib_loader = torch.utils.data.DataLoader(calib_dataset,  batch_size=1)
+比如：
 
-# 校准数据要求
-# - 数量：100-500 张
-# - 分布：覆盖典型输入场景
-# - 预处理：与推理时一致
-```
+- 校准时是 `0-1` 归一化。
+- 真机推理时却用了 `-1 到 1`。
 
-### 4.2 校准策略
+这种错误看起来像“QNN 精度差”，其实是数据链路不一致。
 
-```python
-# Min-Max 校准
-quantizer = PostTrainingQuantizer(
-    model=model, 
-    calibration_data=calib_data, 
-    quant_scheme='min_max'
-)
+### 4.2 动态 shape 太多
 
-# 熵校准（推荐）
-quantizer = PostTrainingQuantizer(
-    model=model, 
-    calibration_data=calib_data, 
-    quant_scheme='entropy'
-)
+QNN 当然不是完全不能碰动态 shape，但在初版部署里，我强烈建议先把输入尺寸固定。
 
-# 百分位校准
-quantizer = PostTrainingQuantizer(
-    model=model, 
-    calibration_data=calib_data, 
-    quant_scheme='percentile', 
-    percentile=99.9
-)
-```
+因为一旦动态维度多起来，排错范围会迅速扩大：
 
-## 5. 量化精度验证
+- 转换问题。
+- 量化问题。
+- 图编译问题。
+- 运行期输入描述问题。
 
-```python
-import numpy as np
+## 5. 怎么做第一轮精度验证
 
-def evaluate_quantization(model_fp32,  model_int8,  test_loader):
-    """比较量化前后精度"""
-    
-    correct_fp32 = 0
-    correct_int8 = 0
-    total = 0
-    
-    for images,  labels in test_loader:
-        # FP32 推理
-        output_fp32 = model_fp32(images)
-        pred_fp32 = output_fp32.argmax(dim=1)
-        
-        # INT8 推理
-        output_int8 = model_int8(images)
-        pred_int8 = output_int8.argmax(dim=1)
-        
-        correct_fp32 += (pred_fp32 == labels).sum().item()
-        correct_int8 += (pred_int8 == labels).sum().item()
-        total += labels.size(0)
-    
-    print(f"FP32 Accuracy: {100 * correct_fp32 / total:.2f}%")
-    print(f"INT8 Accuracy: {100 * correct_int8 / total:.2f}%")
-    print(f"Accuracy Drop: {100 * (correct_fp32 - correct_int8) / total:.2f}%")
-```
+我建议分三层看：
 
-## 6. 常见问题
+1. 原始框架结果。
+2. ONNX 结果。
+3. QNN 执行结果。
 
-### 6.1 精度下降过多
+如果差异出现，按这个顺序回溯。不要一上来就把所有问题都怪到 `HTP` 上。
 
-- 增加校准数据量
-- 尝试熵校准
-- 对敏感层使用 INT16 或 FP16
+## 6. 一个务实的初版策略
 
-### 6.2 某些算子不支持量化
+如果你现在只是想把流程走通，我建议：
 
-- 检查 QNN 支持的算子列表
-- 对不支持的算子保持 FP32
+- 不要一开始就追最激进的 bit-width。
+- 先选一份稳定校准集。
+- 先追求结果可对齐。
+- 之后再讨论层级混合精度和更复杂的量化策略。
 
-### 6.3 动态 shape 问题
+## 7. 这一篇的结论
 
-- 使用固定 input shape
-- 或配置 dynamic shape 支持
+QNN 量化真正的关键不是背命令，而是记住这条工程链：
 
----
+- 模型先干净。
+- 校准要真实。
+- 转换和生成模型库分开看。
+- context binary 是部署态产物，不是训练态产物。
 
-## 参考链接
-
-- [QNN 量化文档](https://developer.qualcomm.com/software/qualcomm-ai-engine-direct-sdk/getting-started/quantization)
-- [AIMET 量化工具](https://quic.github.io/aimet-pages/)
-
+只要这条链是清楚的，后面加脚本、加实测、加图都很顺。

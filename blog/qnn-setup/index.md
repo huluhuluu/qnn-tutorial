@@ -1,138 +1,165 @@
 ---
 title: "QNN 环境配置"
 date: 2026-04-01T15:30:00+08:00
-lastmod: 2026-04-01T15:30:00+08:00
+lastmod: 2026-04-15T21:20:00+08:00
 draft: false
-description: "QNN SDK 安装与配置指南"
+description: "QNN SDK、Android NDK 与设备侧运行环境的初版配置指南"
 slug: "qnn-setup"
 tags: ["qnn"]
 categories: ["qnn"]
-
 comments: true
 math: true
 ---
 
 # QNN 环境配置
 
-本文介绍如何安装和配置 QNN SDK 开发环境。
+这一篇不追求“一个命令复制就跑通”，而是先把环境拆成三段来理解：
 
-## 1. 系统要求
+1. 宿主机工具链。
+2. 交叉编译环境。
+3. 手机端运行时环境。
 
-### 1.1 开发环境
+真正卡人的地方通常不是第 1 步，而是第 2 步和第 3 步混在一起。
 
-- Ubuntu 20.04/22.04 或 Windows 10/11
-- Python 3.8+
-- CMake 3.13+
-- Android NDK (Android 开发)
+## 1. 先准备哪些东西
+
+### 1.1 宿主机
+
+- `QNN SDK`
+- `Python`
+- `CMake`
+- `Android NDK`
+- 一个能正常工作的 `adb`
 
 ### 1.2 目标设备
 
-- Snapdragon 8 Gen 1 及以上（推荐）
-- Snapdragon 888 及以上
-- 其他 Snapdragon 处理器（部分功能支持）
+- 推荐较新的 Snapdragon 平台。
+- 如果目标是 `HTP`，设备代际越新越省心。
 
-## 2. 下载 QNN SDK
+## 2. 推荐的目录组织
 
-从 Qualcomm 开发者网站下载：
+我建议一开始就把目录分开，不要把所有产物塞在一个文件夹里：
 
+```text
+workspace/
+├── qnn-sdk/
+├── models/
+├── build/
+├── output/
+└── device_push/
 ```
-https://developer.qualcomm.com/software/qualcomm-ai-engine-direct-sdk
-```
 
-需要注册 Qualcomm 开发者账号。
+分别放：
 
-## 3. 安装 QNN SDK
+- `qnn-sdk`：SDK 本体。
+- `models`：原始模型和校准数据。
+- `build`：交叉编译中间产物。
+- `output`：模型库、context binary。
+- `device_push`：准备推到手机上的文件。
 
-### 3.1 Linux
+## 3. 必要环境变量
+
+最少要把 SDK 根目录和 NDK 根目录固定下来：
 
 ```bash
-# 解压 SDK
-unzip qnn-sdk-linux.zip -d ~/qnn
-
-# 设置环境变量
-export QNN_SDK_ROOT=~/qnn/QNN
-export PATH=$PATH:$QNN_SDK_ROOT/bin
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$QNN_SDK_ROOT/lib
-
-# 添加到 ~/.bashrc
-echo 'export QNN_SDK_ROOT=~/qnn/QNN' >> ~/.bashrc
-echo 'export PATH=$PATH:$QNN_SDK_ROOT/bin' >> ~/.bashrc
-echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$QNN_SDK_ROOT/lib' >> ~/.bashrc
+export QNN_SDK_ROOT=/path/to/qnn-sdk
+export ANDROID_NDK=/path/to/android-ndk
 ```
 
-### 3.2 Windows
-
-```powershell
-# 解压到目标目录
-Expand-Archive qnn-sdk-windows.zip -DestinationPath C:\qnn
-
-# 设置环境变量
-$env:QNN_SDK_ROOT = "C:\qnn\QNN"
-$env:Path += ";C:\qnn\QNN\bin"
-
-# 永久设置
-[Environment]::SetEnvironmentVariable("QNN_SDK_ROOT",  "C:\qnn\QNN",  "User")
-```
-
-## 4. 验证安装
+如果你习惯脚本化，也可以额外准备：
 
 ```bash
-# 检查版本
-qnn-version
-
-# 查看支持的算子
-qnn-op-list
-
-# 运行示例
-cd $QNN_SDK_ROOT/examples
-python run_example.py
+export PATH=$QNN_SDK_ROOT/bin:$PATH
 ```
 
-## 5. Python 环境
+## 4. 宿主机侧最先检查什么
 
-```bash
-# 创建虚拟环境
-python -m venv qnn-env
-source qnn-env/bin/activate
+先确认下面几件事：
 
-# 安装依赖
-pip install torch onnx onnxruntime
-pip install $QNN_SDK_ROOT/python/qnn-*.whl
+- QNN 的转换工具是否能调用。
+- NDK 是否能正常被 `cmake` 识别。
+- `adb devices` 是否能看到真机。
+
+如果这三件事还没稳定，不建议马上开始研究 HTP 细节。
+
+## 5. Android 端你最终要推什么
+
+很多初学者只推了可执行文件和模型，结果程序一运行就报动态库错误。更稳妥的思路是把设备侧文件分成三类：
+
+- 你的可执行程序或 app 产物。
+- QNN 运行时相关动态库。
+- 模型产物，比如 model library、context binary、配置文件。
+
+一个典型的设备侧临时目录可能长这样：
+
+```text
+/data/local/tmp/qnn_demo/
+├── demo_binary
+├── libQnnSystem.so
+├── libQnnHtp.so
+├── 其他后端依赖
+├── model.so
+└── model.bin
 ```
 
-## 6. Android 交叉编译
+## 6. 交叉编译时我会先验证什么
 
-```bash
-# 设置 NDK 路径
-export ANDROID_NDK=/path/to/ndk
+在碰真实模型前，先验证下面两件事：
 
-# 交叉编译示例
-cd $QNN_SDK_ROOT/examples
-mkdir build && cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
-         -DANDROID_ABI=arm64-v8a \
-         -DANDROID_PLATFORM=android-30
-make -j4
-```
+1. 能否用 NDK 编出一个最小 native 可执行程序。
+2. 这个程序能否在手机端被正确加载，并找到需要的 `.so`。
 
-## 7. 常见问题
+原因很简单：如果连动态库加载链路都没打通，后面模型转换和量化结果根本没法验证。
 
-### 7.1 找不到 QNN 库
+## 7. 设备侧最常见的三个坑
 
-确保 `LD_LIBRARY_PATH` 包含 QNN lib 目录。
+### 7.1 找不到动态库
 
-### 7.2 Python 绑定错误
+表象：
 
-确保 Python 版本兼容，并正确安装 wheel 包。
+- 启动直接报 `dlopen failed`
+- 找不到 `libQnn*.so`
 
-### 7.3 设备不支持
+先检查：
 
-部分功能需要较新的 Snapdragon 处理器。
+- 文件是不是都推到了同一目录。
+- `LD_LIBRARY_PATH` 是否包含该目录。
 
----
+### 7.2 后端版本不匹配
 
-## 参考链接
+表象：
 
-- [QNN SDK 下载](https://developer.qualcomm.com/software/qualcomm-ai-engine-direct-sdk)
-- [QNN 示例代码](https://github.com/quic/aimet-model-zoo)
+- 能加载主库，但执行时通信失败或初始化失败。
 
+这通常不是代码逻辑问题，而是 SDK、设备和具体后端依赖不匹配。
+
+### 7.3 你以为是 QNN 问题，其实是 NDK 问题
+
+比如：
+
+- ABI 不一致。
+- STL 选择不一致。
+- Android 平台版本过低。
+
+所以一开始就把 `CMAKE_TOOLCHAIN_FILE`、`ANDROID_ABI`、`ANDROID_PLATFORM` 写死，会省很多时间。
+
+## 8. 一个稳妥的初版流程
+
+我建议按下面顺序推进：
+
+1. 安装 SDK 和 NDK。
+2. 确认 `adb`、交叉编译和动态库加载没问题。
+3. 再去做模型转换。
+4. 最后再碰 `HTP` 和量化。
+
+原因是：前两步更像系统工程，后两步更像模型工程。混在一起排错非常痛苦。
+
+## 9. 这一篇的结论
+
+QNN 环境配置真正要解决的不是“把 SDK 解压了没有”，而是：
+
+- 宿主机工具链是否稳定。
+- 手机端运行时链路是否稳定。
+- 你有没有把模型产物和运行时依赖分清楚。
+
+只要这三件事理顺，后面的量化和 Graph API 才有意义。
