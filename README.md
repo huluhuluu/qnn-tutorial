@@ -8,8 +8,8 @@
 |------|------|------|
 | [QNN 介绍](blog/qnn-intro/index.md) | 梳理`QNN`各部分关系与调用顺序 | ✅ 完成 |
 | [QNN 环境](blog/qnn-setup/index.md) | 以 `MatMul` 为主线，串联`QNN`配置与运行 | ✅ 完成 |
-| [QNN 环境 py版](blog/qnn-setup/index.md) | 以 `MatMul` 为主线，串联`QNN python`工具链配置与运行 | ✅ 完成 |
-| [QNN 文档](blog/qnn-doc-reading/index.md) | 常用文档阅读 | ✅ 完成 |
+| [QNN 环境 py版](blog/qnn-setup-py/index.md) | 以 `MatMul` 为主线，串联`QNN python`工具链配置与运行 | ✅ 完成 |
+| [QNN 文档](blog/qnn-doc/index.md) | 常用文档阅读 | ✅ 完成 |
 
 
 ## 参考资源

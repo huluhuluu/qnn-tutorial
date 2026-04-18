@@ -8,7 +8,7 @@ slug: "qnn-setup"
 tags: ["qnn"]
 categories: ["qnn"]
 comments: true
-math: false
+math: true
 ---
 
 # QNN 环境准备与在线构图 MatMul 示例

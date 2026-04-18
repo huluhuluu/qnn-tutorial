@@ -59,14 +59,16 @@ math: true
 ![图 10. Qnn_QuantizeParams_t 结构体定义](./png/api-rst-qnn-quantizeparams-definition.png "图 10. Qnn_QuantizeParams_t 结构体定义")
 具体可以继续深入查看，例如 `Qnn_AxisScaleOffset_t` 结构体的定义如下图, 该结构体包含了量化轴、量化参数数量、缩放值与零点值等字段信息。
 ![图 11. Qnn_AxisScaleOffset_t 结构体定义](./png/api-rst-qnn-axis-scale-offset-definition.png "图 11. Qnn_AxisScaleOffset_t 结构体定义")
-继续深入可以看到量化公式$float_value = (quantized_value + offset) * scale$，如下图, 
+继续深入可以看到量化公式$floatValue = (quantizedValue + offset) * scale$，如下图, 
 ![图 12. 量化与反量化公式说明](./png/api-rst-quantization-formula.png "图 12. 量化与反量化公式说明")
 
 ## 4. 数据类型
 
 在算子定义中看到了数据类型的约束，但是查文档只能查到粗糙的枚举类型，没有具体刻画各个数据类型的细节，如下图
 ![图 13. Qnn_DataType_t 枚举定义](./png/api-rst-qnn-datatype-enum.png "图 13. Qnn_DataType_t 枚举定义")
-直接喂给 `codex` 查文档，
+
+
+话又说回来了，这么大文档直接喂给 `codex` 查更方便，
 > `Qnn_DataType_t` 的分类定义在 `/root/qairt/2.40.0.251030/include/QNN/QnnTypes.h:103`：
 > - `INT_*`: 有符号整数，精确整数语义
 > - `UINT_*`: 无符号整数，精确整数语义

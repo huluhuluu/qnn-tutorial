@@ -20,5 +20,5 @@ math: true
 |------|------|------|
 | [QNN 介绍](/p/qnn-intro/) | 梳理`QNN`各部分关系与调用顺序 | ✅ 完成 |
 | [QNN 环境](/p/qnn-setup/) | 以 `MatMul` 为主线，串联`QNN`配置与运行 | ✅ 完成 |
-| [QNN 环境 py版](/p/qnn-setup/) | 以 `MatMul` 为主线，串联`QNN python`工具链配置与运行 | ✅ 完成 |
-| [QNN 文档](/p/qnn-doc-reading/) | 常用文档阅读 | ✅ 完成 |
+| [QNN 环境 py版](/p/qnn-setup-py/) | 以 `MatMul` 为主线，串联`QNN python`工具链配置与运行 | ✅ 完成 |
+| [QNN 文档](/p/qnn-doc/) | 常用文档阅读 | ✅ 完成 |
