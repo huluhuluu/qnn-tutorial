@@ -22,8 +22,17 @@ target_include_directories(
     "${QNN_SDK_ROOT}/include"
     "${QNN_SDK_ROOT}/include/QNN")
 
+add_executable(qnn_precision_benchmark precision_benchmark.cpp)
+target_include_directories(
+  qnn_precision_benchmark
+  PRIVATE
+    "${QNN_SDK_ROOT}/include"
+    "${QNN_SDK_ROOT}/include/QNN")
+
 if(ANDROID)
   target_link_libraries(qnn_online_matmul PRIVATE dl log)
+  target_link_libraries(qnn_precision_benchmark PRIVATE dl log)
 else()
   target_link_libraries(qnn_online_matmul PRIVATE dl)
+  target_link_libraries(qnn_precision_benchmark PRIVATE dl)
 endif()

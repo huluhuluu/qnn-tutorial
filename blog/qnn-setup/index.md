@@ -1,7 +1,7 @@
 ---
-title: "QNN 环境准备与在线构图 MatMul 示例"
+title: "QNN 环境准备与实例"
 date: 2026-04-01T15:30:00+08:00
-lastmod: 2026-04-18T10:00:00+08:00
+lastmod: 2026-04-18T18:30:00+08:00
 draft: false
 description: "使用 QNN C++ API 的在线构图 MatMul 示例，展示同一份代码在 CPU、GPU、HTP 上的执行流程。"
 slug: "qnn-setup"
@@ -13,7 +13,7 @@ math: false
 
 # QNN 环境准备与在线构图 MatMul 示例
 
-这篇把 [QNN 介绍](../qnn-intro/) 里的在线构图执行方式整理成一个最小 `C++` 示例，并且把同一份代码在宿主机 `CPU`、手机端 `GPU`、手机端 `HTP` 上都跑通。
+这篇把 [QNN 介绍](../qnn-intro/) 里的在线构图执行方式整理成一个最小 `C++` 示例，并且把同一份代码在`CPU`、 `GPU`、`HTP` 上跑通。
 
 - 执行环境如下
   - 宿主机：`Ubuntu 22.04 x86_64`
@@ -35,7 +35,7 @@ math: false
   *图 2. QNN SDK 下载页面。*
   **部分受限的高通软件中心的工具需要给**[高通销售团队](https://www.qualcomm.com/support/contact/forms/contact-sales-tools) **申请访问权限。**
 - 找个路径解压 SDK, 获得一个类似 `/root/qairt/2.40.0.251030` 的路径
-- 配置环境变量：`source /root/qairt/2.40.0.251030/bin/envsetup.sh` 包括了 `QNN_SDK_ROOT` 环境变量和一些工具链路径，配置在 `~/.bashrc` 或者 `~/.zshrc` 里会更方便一些。
+- 配置环境变量：`cd /root/qairt/2.40.0.251030/bin && source envsetup.sh ` 包括了 `QNN_SDK_ROOT` 环境变量和一些工具链路径，配置在 `~/.bashrc` 或者 `~/.zshrc` 里会更方便一些。
 - 安装依赖：`sudo /root/qairt/2.40.0.251030/bin/check-linux-dependency.sh`
 - 检查环境：`/root/qairt/2.40.0.251030/bin/envcheck -c`
 - 后续 `python` 需要使用给定的 [依赖版本](https://docs.qualcomm.com/nav/home/linux_setup.html?product=1601111740010412#step-6-optional-additional-packages)
@@ -259,21 +259,25 @@ qnnInterface.logFree(logger);
 
 ## 3. 宿主机编译
 
-- 先准备环境变量，通常只需要把 `QNN_SDK_ROOT` 指向 `QNN SDK` 路径就行了, 或者使用前面的 `source /root/qairt/2.40.0.251030/bin/envsetup.sh` 来加载一系列环境变量。保证`echo $QNN_SDK_ROOT && echo ANDROID_NDK_ROOT`能正确输出 SDK和NDK 路径。
-- 交叉编译, 这里同时使用了 `QNN SDK` 和 `Android NDK` 的工具链文件：
+- 📦 先准备环境变量，通常只需要把 `QNN_SDK_ROOT` 指向 `QNN SDK` 路径就行了, 或者使用前面的 `cd /root/qairt/2.40.0.251030/bin && source envsetup.sh` 来加载一系列环境变量。保证`echo $QNN_SDK_ROOT && echo ANDROID_NDK_ROOT`能正确输出 SDK和NDK 路径。
+- 🛠️ 交叉编译, 这里同时使用了 `QNN SDK` 和 `Android NDK` 的工具链文件。
+- 📱 这里建议单独使用 `build/qnn-setup-android` 作为 Android 构建目录，避免和宿主机 `build/qnn-setup` 混用。
+- ⚠️ shell 续行的反斜杠 `\` 后面不要直接跟注释，否则后续 `-D...` 参数会被 shell 当成单独命令执行。
   ```bash
   # 确保环境变量正常
   # export QNN_SDK_ROOT=/root/qairt/2.40.0.251030
   # export ANDROID_NDK_ROOT=/root/android-ndk/android-ndk-r29
 
   cmake -S blog/qnn-setup -B build/qnn-setup-android \
-    -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake \  # 指定 Android NDK 的 CMake 工具链文件，启用交叉编译
-    -DANDROID_ABI=arm64-v8a \          # 指定编译目标平台和架构
-    -DANDROID_PLATFORM=android-31 \    # 指定编译目标平台和架构
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON # 生成编译命令文件，方便后续分析编译细节
+    -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
+    -DANDROID_ABI=arm64-v8a \
+    -DANDROID_PLATFORM=android-31 \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-  cmake --build build/qnn-setup-android -j4 # 编译项目，生成可执行文件和相关库
+  cmake --build build/qnn-setup-android -j4 --target qnn_online_matmul
   ```
+- ✅ 推送到手机的可执行文件应该来自 `build/qnn-setup-android/`，不能把宿主机 `x86_64` 产物直接推到 Android 设备上。
+
 ## 4. 目标设备运行
 
 - 把依赖的动态库等文件推送给 `adb` 设备
@@ -539,3 +543,158 @@ graph_finalize                        32
 graph_execute                       1066
 result_validate                       47
 ```
+
+## 5. `benchmark`
+
+基于上述示例构建了一个测试不同精度/后端性能的`benchmark`，方便快速做端侧验证和横向对比。🧪
+
+### 5.1 编译
+
+Android 交叉编译：
+
+```bash
+# 确保环境变量正常
+# export QNN_SDK_ROOT=/root/qairt/2.40.0.251030
+# export ANDROID_NDK_ROOT=/root/android-ndk/android-ndk-r29
+
+cmake -S blog/qnn-setup -B build/qnn-setup-android \
+  -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
+  -DANDROID_ABI=arm64-v8a \
+  -DANDROID_PLATFORM=android-31 \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+cmake --build build/qnn-setup-android -j4 --target qnn_precision_benchmark
+```
+
+### 5.2 命令行参数
+
+`qnn_precision_benchmark` 支持以下参数：
+
+```text
+--backend <path>         指定 backend 动态库路径
+--dump-backend-info      打印 provider、interface、capability 信息
+--m <rows>               左矩阵行数，默认 256
+--k <inner>              矩阵归约维度，默认 512
+--n <cols>               右矩阵列数，默认 512
+--warmup <count>         预热次数，默认 3
+--iters <count>          正式计时轮数，默认 10
+--precisions <list>      精度列表，默认 fp32,int8,int16,fp16
+```
+
+如果要快速查看后端信息，也可以在运行前设置：
+
+```bash
+export QNN_DUMP_BACKEND_INFO=1
+```
+
+### 5.3 执行
+
+下面的命令把可执行文件和三种后端需要的动态库一次性推到同一个目录：
+
+```bash
+export BENCH_DIR=/data/local/tmp/qnn_precision_benchmark
+adb -s 127.0.0.1:40404 shell "mkdir -p $BENCH_DIR"
+
+adb -s 127.0.0.1:40404 push \
+  build/qnn-setup-android/qnn_precision_benchmark \
+  $QNN_SDK_ROOT/lib/aarch64-android/libQnnCpu.so \
+  $QNN_SDK_ROOT/lib/aarch64-android/libQnnGpu.so \
+  $QNN_SDK_ROOT/lib/aarch64-android/libQnnHtp.so \
+  $QNN_SDK_ROOT/lib/aarch64-android/libQnnHtpPrepare.so \
+  $QNN_SDK_ROOT/lib/aarch64-android/libQnnHtpV79Stub.so \
+  $QNN_SDK_ROOT/lib/hexagon-v79/unsigned/libQnnHtpV79Skel.so \
+  $ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so \
+  $BENCH_DIR/
+```
+
+#### 5.3.1 CPU 测试
+
+```bash
+adb -s 127.0.0.1:40404 shell "
+  cd $BENCH_DIR && \
+  export LD_LIBRARY_PATH=$BENCH_DIR && \
+  ./qnn_precision_benchmark \
+    --backend ./libQnnCpu.so \
+    --m 64 --k 128 --n 128 \
+    --warmup 1 --iters 3
+"
+```
+
+#### 5.3.2 GPU 测试
+
+```bash
+adb -s 127.0.0.1:40404 shell "
+  cd $BENCH_DIR && \
+  export LD_LIBRARY_PATH=$BENCH_DIR && \
+  ./qnn_precision_benchmark \
+    --backend ./libQnnGpu.so \
+    --m 64 --k 128 --n 128 \
+    --warmup 1 --iters 3
+"
+```
+
+#### 5.3.3 HTP 测试
+
+```bash
+adb -s 127.0.0.1:40404 shell "
+  cd $BENCH_DIR && \
+  export LD_LIBRARY_PATH=$BENCH_DIR && \
+  export ADSP_LIBRARY_PATH=$BENCH_DIR && \
+  ./qnn_precision_benchmark \
+    --backend ./libQnnHtp.so \
+    --m 64 --k 128 --n 128 \
+    --warmup 1 --iters 3
+"
+```
+
+
+### 5.6 支持矩阵
+
+以 `MatMul` 为例，当前文档和实际测试对应的支持范围如下：
+
+- ✅ `CPU`：支持 `fp32/int8`，`int16/fp16` 会显示为 `UNSUPPORTED`
+- ✅ `GPU`：支持 `fp32/fp16`，`int8/int16` 会显示为 `UNSUPPORTED`
+- ✅ `HTP`：支持 `fp32/int8/int16/fp16`
+
+这里的 `UNSUPPORTED` 现在优先来自 `backendValidateOpConfig()` 的运行时探测；如果探测接口不可用，或者目标端 `Android + HTP + int8 MatMul` 会在 `libQnnHtpPrepare.so` 的探测路径里崩溃，就回退到文档支持矩阵，再以实际建图执行结果为准。⚠️
+
+### 5.7 输出怎么看
+
+输出示例如下：
+
+```text
+QNN MatMul Precision Benchmark
+backend_kind : NPU
+backend_path : ./libQnnHtp.so
+htp_soc_model: 69
+htp_arch     : 79
+shape        : A[64, 128] x B[128, 128] -> C[64, 128]
+warmup       : 1
+iterations   : 3
+
+Results
+precision status              init(ms)     build(ms)              exec(ms)     release(ms)     total(ms)     max_abs_err    mean_abs_err
+----------------------------------------------------------------------------------------------------------------------------------------
+int8      OK                  205.5645        9.0797        0.7750±0.0580         22.4316      242.4618          0.0271          0.0080
+int16     OK                   35.2989       30.6419        0.8010±0.1014         20.8287       94.3954          0.0042          0.0017
+fp16      OK                   28.1247       29.3391        0.7863±0.0760         21.3840       86.8039          0.0017          0.0004
+fp32      OK                  175.9133       10.8606        0.7313±0.0520         22.8998      214.1842          0.0017          0.0004
+
+GPU Results
+precision status              init(ms)     build(ms)              exec(ms)     release(ms)     total(ms)     max_abs_err    mean_abs_err
+----------------------------------------------------------------------------------------------------------------------------------------
+fp16      OK                    5.7818      340.2971        0.2037±0.0488          2.9731      350.4211          0.0017          0.0004
+fp32      OK                    6.0046      332.3594        0.3467±0.2124          2.9880      343.1908          0.0000          0.0000
+CPU Results
+precision status              init(ms)     build(ms)              exec(ms)     release(ms)     total(ms)     max_abs_err    mean_abs_err
+----------------------------------------------------------------------------------------------------------------------------------------
+int8      OK                   15.4623        0.2046        0.0167±0.0081          0.5728       17.1529          0.0398          0.0115
+fp32      OK                   12.4459        0.2005        0.9967±0.0615          0.2930       17.3047          0.0000          0.0000
+```
+
+各列的含义如下：
+
+- `init/build/release/total (ms)`：初始化、建图、资源释放和总耗时
+- `exec(ms)`：多轮 `QnnGraph_execute()` 的平均值和标准差，格式是 `mean±std`
+- `max_abs_err`：输出和 `float` 参考值的最大绝对误差
+- `mean_abs_err`：输出和 `float` 参考值的平均绝对误差
