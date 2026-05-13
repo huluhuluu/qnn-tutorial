@@ -22,3 +22,5 @@ math: true
 | [QNN 环境](/p/qnn-setup/) | 以 `MatMul` 为主线，串联`QNN`配置与运行 | ✅ 完成 |
 | [QNN 环境 py版](/p/qnn-setup-py/) | 以 `MatMul` 为主线，串联`QNN python`工具链配置与运行 | ✅ 完成 |
 | [QNN 文档](/p/qnn-doc/) | 常用文档阅读 | ✅ 完成 |
+| [QNN MatMul 权重静态化与输入化](/p/qnn-matmul-weight-static/) | 分析权重静态化对图体积和执行时间的影响 | ✅ 完成 |
+| [QNN HTP OpPackage Softmax 源码分析](/p/qnn-oppackage-softmax/) | 学习 `ExampleOpPackageSoftmax.cpp` 的注册、优化和实现 | ✅ 完成 |

@@ -518,7 +518,8 @@ bool isPrecisionDocumentedSupported(BackendKind backendKind, PrecisionKind preci
     case BackendKind::Gpu:
       return precision == PrecisionKind::Fp32 || precision == PrecisionKind::Fp16;
     case BackendKind::Htp:
-      return true;
+      return precision == PrecisionKind::Fp16 || precision == PrecisionKind::Int8 ||
+             precision == PrecisionKind::Int16;
     case BackendKind::Unknown:
       return true;
   }
