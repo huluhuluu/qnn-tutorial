@@ -18,9 +18,9 @@ math: true
 围绕 Qualcomm QNN / QAIRT 的中文教程仓库。
 | 文章 | 说明 | 状态 |
 |------|------|------|
-| [QNN 介绍](/p/qnn-intro/) | 梳理`QNN`各部分关系与调用顺序 | ✅ 完成 |
+| [QNN 介绍](blog/qnn-intro/index.md) | 梳理`QNN`各部分关系与调用顺序 | ✅ 完成 |
 | [QNN 环境](/p/qnn-setup/) | 以 `MatMul` 为主线，串联`QNN`配置与运行 | ✅ 完成 |
-| [QNN 环境 py版](/p/qnn-setup-py/) | 以 `MatMul` 为主线，串联`QNN python`工具链配置与运行 | ✅ 完成 |
-| [QNN 文档](/p/qnn-doc/) | 常用文档阅读 | ✅ 完成 |
-| [QNN MatMul 权重静态化与输入化](/p/qnn-matmul-weight-static/) | 分析权重静态化对图体积和执行时间的影响 | ✅ 完成 |
-| [QNN HTP OpPackage Softmax 源码分析](/p/qnn-oppackage-softmax/) | 学习 `ExampleOpPackageSoftmax.cpp` 的注册、优化和实现 | ✅ 完成 |
+| [QNN 环境 py版](blog/qnn-setup-py/index.md) | 以 `MatMul` 为主线，串联`QNN python`工具链配置与运行 | ✅ 完成 |
+| [QNN 文档](blog/qnn-doc/index.md) | 常用文档阅读 | ✅ 完成 |
+| [QNN MatMul 权重静态化与输入化](blog/qnn-matmul-weight-static/index.md) | 分析权重静态化对图体积和执行时间的影响 | ✅ 完成 |
+| [QNN HTP OpPackage Softmax 源码分析](blog/qnn-oppackage-softmax/index.md) | 学习 `ExampleOpPackageSoftmax.cpp` 的注册、优化和实现 | ✅ 完成 |
